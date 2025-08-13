@@ -9,7 +9,7 @@
 
 ## 🎯 Overview
 
-This interactive chatbot is designed specifically for "The Last of Us Part 2" players who want quick access to game information without alt-tabbing or breaking their gaming experience. Built as a lightweight Windows executable, it provides instant responses to queries about characters, locations, items, and weapons using a structured SQL database.
+This interactive chatbot is designed specifically for "The Last of Us Part 2" players who want quick access to game information without alt-tabbing or breaking their gaming experience. It is built as a lightweight Windows application and it provides instant responses to questions about characters, locations, items, and weapons.
 
 ### 🎮 Why This Project?
 
@@ -17,7 +17,7 @@ This interactive chatbot is designed specifically for "The Last of Us Part 2" pl
 - **Data-Driven Responses**: No AI hallucinations, only verified game data
 - **Lightweight & Fast**: Optimized for minimal system impact
 - **Easy Access**: Simple desktop shortcut integration
-<!--
+
 ## ✨ Features
 
 ### 🔍 **Smart Query System**
@@ -56,7 +56,7 @@ This interactive chatbot is designed specifically for "The Last of Us Part 2" pl
 
 - Windows 10/11
 
-### Quick Start (End Users)
+### How to use
 
 1. **Download the latest release**
    ```
@@ -81,22 +81,31 @@ This interactive chatbot is designed specifically for "The Last of Us Part 2" pl
 - **Location Details**: `"Describe Seattle"` or `"What's in the hospital?"`
 - **Item Information**: `"What does the health kit do?"` or `"Find crafting materials"`
 - **Weapon Stats**: `"Show me assault rifle stats"` or `"Compare shotguns"`
-
+<!--
 ### Advanced Features
 
 - **Filtered Searches**: Use specific keywords to narrow down results
 - **Quick References**: Access frequently requested information instantly
 - **Context-Aware Responses**: Get relevant information based on your query context
-
+-->
 ## 📁 Project Structure
 
 ```
-tlou2-interactive-chatbot/
-├── 📂 src/
-│   ├── 📄 main.py              # Main application entry point
-│   ├── 📄 chatbot.py           # Core chatbot logic
-│   ├── 📄 database.py          # Database connection and queries
-│   └── 📄 gui.py               # User interface components
+The_Last_Of_Us_Part_II_Chatbot/
+├── 📂 Scraper_+_Data/
+│   ├── 📄 Game_Data_Scraper.ipynb  # Core scraping logic
+│   ├── 📄 chapter_data.csv         # Data on all game chapters
+│   ├── 📄 walkthrough_data.csv     # Data on all mission walkthroughs
+│   ├── 📄 character_data.csv       # Data on all game characters
+│   ├── 📄 safe_codes_data.csv      # Data on all game safe codes
+│   ├── 📄 throphy_data.csv         # Data on all game achievements
+│   ├── 📄 weapon_upgrades.csv      # Data on all weapons and upgrades
+│   └── 📄 enemies_data.csv         # Data on all game enemy types
+└── 📄 README.md               # This file
+```
+<!--
+
+
 ├── 📂 data/
 │   ├── 📄 raw_game_data.csv    # Raw game data files
 │   ├── 📄 processed_data.csv   # Cleaned data for database
@@ -109,8 +118,8 @@ tlou2-interactive-chatbot/
 │   └── 📄 test_chatbot.py      # Chatbot functionality tests
 ├── 📄 requirements.txt         # Python dependencies
 ├── 📄 setup.py                 # Application setup script
-└── 📄 README.md               # This file
-```
+
+
 
 ## 🔄 Development Phases
 
