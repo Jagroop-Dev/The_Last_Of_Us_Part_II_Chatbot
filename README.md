@@ -7,22 +7,6 @@
 
 > A comprehensive, data-driven chatbot companion for "The Last of Us Part 2" that provides instant access to game information without breaking immersion.
 
-## 📋 Table of Contents
-
-- [Overview](#overview)
-- [Features](#features)
-- [Technologies Used](#technologies-used)
-- [Installation](#installation)
-- [Usage](#usage)
-- [Database Structure](#database-structure)
-- [Project Structure](#project-structure)
-- [Development Phases](#development-phases)
-- [Screenshots](#screenshots)
-- [Performance Metrics](#performance-metrics)
-- [Contributing](#contributing)
-- [License](#license)
-- [Acknowledgments](#acknowledgments)
-
 ## 🎯 Overview
 
 This interactive chatbot is designed specifically for "The Last of Us Part 2" players who want quick access to game information without alt-tabbing or breaking their gaming experience. Built as a lightweight Windows executable, it provides instant responses to queries about characters, locations, items, and weapons using a structured SQL database.
