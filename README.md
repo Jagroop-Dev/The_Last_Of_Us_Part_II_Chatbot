@@ -92,24 +92,44 @@ This interactive chatbot is designed specifically for "The Last of Us Part 2" pl
 
 ```
 The_Last_Of_Us_Part_II_Chatbot/
-├── 📂 Scraper_+_Data/
+├── 📂 Scraper/
 │   ├── 📄 Game_Data_Scraper.ipynb  # Core scraping logic
+├── 📂 Data/
+│   ├── 📂 Images/                  # UI images and icons
+│       ├── 📂 chapter_images             # Location images
+│       ├── 📂 character_icon_images      # Character icons images
+│       ├── 📂 character_images           # Character images
+│       ├── 📂 enemy_images               # Enemy images
+│       ├── 📂 how_to_kill_enemy_images   # How to kill enemy steps images
+│       ├── 📂 safe_code_images           # How to find safe codes images
+│       ├── 📂 tips_images                # Tip banner image
+│       ├── 📂 trophy_images              # Trophy images
+│       └── 📂 weapon_images              # Weapon images
+│   ├── 📄 image_downloader.ipynb   # Image downloader
 │   ├── 📄 chapter_data.csv         # Data on all game chapters
-│   ├── 📄 walkthrough_data.csv     # Data on all mission walkthroughs
 │   ├── 📄 character_data.csv       # Data on all game characters
+│   ├── 📄 detailed_tips_data.csv   # Data on all game tip details
+│   ├── 📄 tips_data.csv            # Data on all game tips
+│   ├── 📄 enemy_data.csv           # Data on all game enemy types
+│   ├── 📄 how_to_kill_enemy.csv    # Data on how to kill game enemies
 │   ├── 📄 safe_codes_data.csv      # Data on all game safe codes
+│   ├── 📄 safe_codes_.csv          # Data on all safe locations and details
 │   ├── 📄 throphy_data.csv         # Data on all game achievements
-│   ├── 📄 weapon_upgrades.csv      # Data on all weapons and upgrades
-│   └── 📄 enemies_data.csv         # Data on all game enemy types
+│   ├── 📄 walkthrough_data.csv     # Data on all mission walkthroughs
+│   ├── 📄 full_weapon_info.csv     # Data on all game weapon details
+│   └── 📄 weapons_data.csv         # Data on all game weapons
 └── 📄 README.md               # This file
 ```
+
+
+
+
+
+
+
+
 <!--
 
-
-├── 📂 data/
-│   ├── 📄 raw_game_data.csv    # Raw game data files
-│   ├── 📄 processed_data.csv   # Cleaned data for database
-│   └── 📄 database_schema.sql  # Database structure
 ├── 📂 assets/
 │   ├── 📂 images/              # UI images and icons
 │   └── 📂 fonts/               # Custom fonts
