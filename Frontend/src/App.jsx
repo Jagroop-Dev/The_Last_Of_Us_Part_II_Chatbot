@@ -1,22 +1,99 @@
-// Main App component
+
 export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [conversations, setConversations] = useState([
-    { id: generateUniqueId(), name: 'New Chat', messages: [] },
-  ]);
-  const [currentChatId, setCurrentChatId] = useState(conversations[0].id);
+  const [conversations, setConversations] = useState([]);
+  const [currentChatId, setCurrentChatId] = useState(null);
   const [newMessage, setNewMessage] = useState('');
   const [isApiLoading, setIsApiLoading] = useState(false);
   const [theme, setTheme] = useState('dark');
-  const [currentPage, setCurrentPage] = useState('chat'); // 'chat', 'trophies', 'collectibles', 'settings'
+  const [currentPage, setCurrentPage] = useState('chat');
   const [settings, setSettings] = useState({
     theme: 'dark',
     fontSize: 16,
     reduceMotion: false
   });
+  const [userId, setUserId] = useState(null);
+  const [isAuthReady, setIsAuthReady] = useState(false);
   const messagesEndRef = useRef(null);
 
-  // Update settings function
+
+
+  useEffect(() => {
+    const authUnsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        setUserId(user.uid);
+      } else {
+        await signInAnonymously(auth);
+      }
+      setIsAuthReady(true);
+    });
+
+    return () => authUnsubscribe();
+  }, []);
+
+ 
+  useEffect(() => {
+    if (!isAuthReady || !userId) return;
+
+  
+    const q = query(
+      collection(db, `users/${userId}/conversations`),
+      orderBy("createdAt", "desc")
+    );
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const convs = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+
+      setConversations(convs);
+
+     
+      if (convs.length === 0) {
+        const newChatRef = doc(collection(db, `users/${userId}/conversations`));
+        const newChatId = newChatRef.id;
+        setDoc(newChatRef, {
+          name: 'New Chat',
+          createdAt: serverTimestamp(),
+          messages: [],
+        });
+        setCurrentChatId(newChatId);
+      } else {
+     
+        if (!convs.some(c => c.id === currentChatId)) {
+          setCurrentChatId(convs[0]?.id || null);
+        }
+      }
+    });
+
+    return () => unsubscribe();
+  }, [isAuthReady, userId]);
+
+
+  useEffect(() => {
+    if (!currentChatId || !userId) return;
+
+    const chatDocRef = doc(db, `users/${userId}/conversations/${currentChatId}`);
+
+    const unsubscribe = onSnapshot(chatDocRef, (doc) => {
+      if (doc.exists()) {
+        const chatData = doc.data();
+        setConversations(prevConversations =>
+          prevConversations.map(conv =>
+            conv.id === currentChatId ? { ...conv, messages: chatData.messages || [] } : conv
+          )
+        );
+      }
+    });
+
+    return () => unsubscribe();
+  }, [currentChatId, userId]);
+
+
+
+
+
+
   const updateSettings = (key, value) => {
     setSettings(prev => ({ ...prev, [key]: value }));
     if (key === 'theme') {
@@ -24,25 +101,22 @@ export default function App() {
     }
   };
 
-  // Scroll to the bottom of the chat on new message
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: settings.reduceMotion ? "auto" : "smooth" });
   };
 
   useEffect(scrollToBottom, [conversations]);
 
-  // Find the current chat object
+
   const currentChat = conversations.find(chat => chat.id === currentChatId);
 
-  // Handle sending a new message
-  // Handle sending a new message
-  // Handle sending a new message
-  // Handle sending a new message
-  // Handle sending a new message
+
   const handleSendMessage = async (e) => {
     e.preventDefault();
-    if (!newMessage.trim()) return;
+    if (!newMessage.trim() || isApiLoading || !currentChatId || !userId) return;
 
+    setIsApiLoading(true);
     const userMessage = {
       id: generateUniqueId(),
       text: newMessage,
@@ -50,85 +124,58 @@ export default function App() {
       timestamp: new Date().toISOString()
     };
 
-    const updatedConversations = conversations.map(chat =>
-      chat.id === currentChatId
-        ? { ...chat, messages: [...chat.messages, userMessage] }
-        : chat
-    );
-    setConversations(updatedConversations);
+   
+    setConversations(prev => prev.map(conv =>
+      conv.id === currentChatId ? { ...conv, messages: [...conv.messages, userMessage] } : conv
+    ));
     setNewMessage('');
-    setIsApiLoading(true);
 
     try {
-      const response = await fetch('http://127.0.0.1:8000/ask', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ text: userMessage.text }),
-      });
+    
+      const chatDocRef = doc(db, `users/${userId}/conversations/${currentChatId}`);
+      await setDoc(chatDocRef, {
+        messages: [...(currentChat?.messages || []), userMessage],
+      }, { merge: true });
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
+      const response = await fetch('YOUR_API_ENDPOINT_HERE', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: userMessage.text })
+      });
 
       const data = await response.json();
-
-      let botMessages = [];
-
-      // Add the text message first
-      botMessages.push({
+      const botMessage = {
         id: generateUniqueId(),
-        type: 'text',
         text: data.answer,
         sender: 'bot',
-        timestamp: new Date().toISOString()
-      });
+        timestamp: new Date().toISOString(),
+        images: data.images
+      };
 
-      // Add image messages for each URL in the images array
-      if (data.images && Array.isArray(data.images)) {
-        data.images.forEach(imageUrl => {
-          botMessages.push({
-            id: generateUniqueId(),
-            type: 'image',
-            src: imageUrl,
-            sender: 'bot',
-            timestamp: new Date().toISOString()
-          });
-        });
-      }
-
-      // Update the conversation with bot's messages (text + image if any)
-      setConversations(prevConversations =>
-        prevConversations.map(chat =>
-          chat.id === currentChatId
-            ? { ...chat, messages: [...chat.messages, ...botMessages] }
-            : chat
-        )
-      );
+     
+      await setDoc(chatDocRef, {
+        messages: [...(currentChat?.messages || []), userMessage, botMessage],
+      }, { merge: true });
 
     } catch (error) {
-      console.error('API call failed:', error);
+      console.error("Error sending message:", error);
       const errorMessage = {
         id: generateUniqueId(),
-        text: "Sorry, I couldn't fetch a response. Please try again later.",
+        text: "Sorry, I'm having trouble connecting right now. Please try again later.",
         sender: 'bot',
         timestamp: new Date().toISOString()
       };
-      setConversations(prevConversations =>
-        prevConversations.map(chat =>
-          chat.id === currentChatId
-            ? { ...chat, messages: [...chat.messages, errorMessage] }
-            : chat
-        )
-      );
+      const chatDocRef = doc(db, `users/${userId}/conversations/${currentChatId}`);
+      await setDoc(chatDocRef, {
+        messages: [...(currentChat?.messages || []), userMessage, errorMessage],
+      }, { merge: true });
     } finally {
       setIsApiLoading(false);
     }
   };
 
 
-  // Create a new chat
+
   const handleNewChat = () => {
     const newChat = { id: generateUniqueId(), name: 'New Chat', messages: [] };
     setConversations([newChat, ...conversations]);
@@ -136,14 +183,14 @@ export default function App() {
     setCurrentPage('chat');
   };
 
-  // Select a different chat
+
   const handleSelectChat = (chatId) => {
     setCurrentChatId(chatId);
     setCurrentPage('chat');
-    setIsSidebarOpen(false); // Close sidebar on mobile
+    setIsSidebarOpen(false);
   };
 
-  // Delete a chat
+
   const handleDeleteChat = (chatId) => {
     const remainingChats = conversations.filter(chat => chat.id !== chatId);
 
@@ -157,7 +204,7 @@ export default function App() {
     }
   };
 
-  // Handle conversation title edits
+
   const handleEditTitle = (chatId, newName) => {
     if (newName.trim() === '') return;
     setConversations(conversations.map(chat =>
@@ -165,14 +212,14 @@ export default function App() {
     ));
   };
 
-  // Toggle between dark and light themes
+
   const toggleTheme = () => {
     const newTheme = theme === 'dark' ? 'light' : 'dark';
     setTheme(newTheme);
     updateSettings('theme', newTheme);
   };
 
-  // Component for chat item in sidebar
+
   const ChatItem = ({ chat, onSelect, onDelete, onEdit }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [title, setTitle] = useState(chat.name);
@@ -252,7 +299,7 @@ export default function App() {
     );
   };
 
-  // Navigation item component
+
   const NavItem = ({ icon, label, page, onClick }) => {
     const isActive = currentPage === page;
     return (
@@ -291,10 +338,10 @@ export default function App() {
       return <SettingsPage theme={theme} settings={settings} updateSettings={updateSettings} />;
     }
 
-    // Chat page content
+
     return (
       <>
-        {/* Messages Area */}
+        {/* Messages */}
         <main className="flex-1 overflow-y-auto" style={{ fontSize: `${settings.fontSize}px` }}>
           {currentChat?.messages.length === 0 ? (
             <div className="flex items-center justify-center h-full p-8">
@@ -615,12 +662,49 @@ export default function App() {
   );
 } import { useState, useRef, useEffect } from 'react';
 
-// Utility function to generate a unique ID
+import { initializeApp } from 'firebase/app';
+import {
+  getAuth,
+  signInAnonymously,
+  onAuthStateChanged,
+} from 'firebase/auth';
+import {
+  getFirestore,
+  doc,
+  setDoc,
+  collection,
+  query,
+  onSnapshot,
+  orderBy,
+  addDoc,
+  getDoc,
+  serverTimestamp,
+} from 'firebase/firestore';
+
+
+
+const firebaseConfig = {
+  apiKey: typeof FIREBASE_API_KEY !== 'undefined' ? FIREBASE_API_KEY : '',
+  authDomain: typeof FIREBASE_AUTH_DOMAIN !== 'undefined' ? FIREBASE_AUTH_DOMAIN : '',
+  projectId: typeof FIREBASE_PROJECT_ID !== 'undefined' ? FIREBASE_PROJECT_ID : '',
+  storageBucket: typeof FIREBASE_STORAGE_BUCKET !== 'undefined' ? FIREBASE_STORAGE_BUCKET : '',
+  messagingSenderId: typeof FIREBASE_MESSAGING_SENDER_ID !== 'undefined' ? FIREBASE_MESSAGING_SENDER_ID : '',
+  appId: typeof FIREBASE_APP_ID !== 'undefined' ? FIREBASE_APP_ID : '',
+  measurementId: typeof FIREBASE_MEASUREMENT_ID !== 'undefined' ? FIREBASE_MEASUREMENT_ID : ''
+};
+
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const auth = getAuth(app);
+
+
+
 const generateUniqueId = () => {
   return 'id-' + Date.now() + '-' + Math.random().toString(16).slice(2);
 };
 
-// SVG Icons
+
 const ChatDotsIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
     <path d="M5 8a1 1 0 1 1-2 0 1 1 0 0 1 2 0m4 0a1 1 0 1 1-2 0 1 1 0 0 1 2 0m4 0a1 1 0 1 1-2 0 1 1 0 0 1 2 0" />
@@ -727,7 +811,7 @@ const TypeIcon = () => (
   </svg>
 );
 
-// Circular Progress Component
+
 const CircularProgress = ({ percentage, size = 200, strokeWidth = 8, color, children, reduceMotion }) => {
   const radius = (size - strokeWidth) / 2;
   const circumference = radius * 2 * Math.PI;
@@ -772,7 +856,7 @@ const CircularProgress = ({ percentage, size = 200, strokeWidth = 8, color, chil
   );
 };
 
-// Settings Page Component
+
 const SettingsPage = ({ theme, settings, updateSettings }) => {
   return (
     <div className="max-w-4xl mx-auto p-6 space-y-8" style={{ fontSize: `${settings.fontSize}px` }}>
@@ -909,7 +993,7 @@ const SettingsPage = ({ theme, settings, updateSettings }) => {
   );
 };
 
-// Trophy Tracking Page Component
+
 const TrophyPage = ({ theme, settings }) => {
   const [trophies, setTrophies] = useState([
     { id: 1, name: "Every Last One of Them", description: "Collect all trophies", unlocked: false, rarity: "Ultra Rare" },
@@ -1063,7 +1147,7 @@ const TrophyPage = ({ theme, settings }) => {
   );
 };
 
-// Collectibles Tracking Page Component
+
 const CollectiblesPage = ({ theme, settings }) => {
   const [collectibles, setCollectibles] = useState([
     { id: 1, category: "Artifact", name: "Volunteer Request", found: false },
@@ -1389,7 +1473,7 @@ const CollectiblesPage = ({ theme, settings }) => {
           </div>
         </div>
 
-        {/* Collectibles List Section - Fixed scrolling issue */}
+        {/* Collectibles List Section */}
         <div className="flex-1 space-y-3">
           <h3 className={`text-xl font-semibold mb-4 ${colors.text}`}>
             Collectibles Checklist
