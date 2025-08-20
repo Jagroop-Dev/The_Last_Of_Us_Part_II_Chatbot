@@ -1,0 +1,21 @@
+steps:
+- name: 'gcr.io/cloud-builders/gsutil'
+  args: ['rsync', '-r', 'gs:// wlf_chatbot_data', '.']
+
+
+- name: 'python'
+  entrypoint: 'python'
+  args: ['create_llm_db.py']
+
+
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['build', '-t', 'gcr.io/$PROJECT_ID/faiss-rag-chatbot', '.']
+
+
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['push', 'gcr.io/$PROJECT_ID/faiss-rag-chatbot']
+
+
+- name: 'gcr.io/google.com/cloudsdk/cloud-sdk'
+  entrypoint: 'gcloud'
+  args: ['run', 'deploy', 'faiss-rag-chatbot', '--image', 'gcr.io/$PROJECT_ID/faiss-rag-chatbot', '--region', 'us-central1', '--platform', 'managed', '--allow-unauthenticated']

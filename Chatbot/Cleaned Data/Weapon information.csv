@@ -1,0 +1,32 @@
+Weapon Category,Weapon Name,Weapon Image,Weapon Description,Weapon Location
+Handguns,Semi-Auto Pistol,../Data/Images/weapon_images/Semi-Auto Pistol.jpg,Short-range handgun with high fire rate and moderate accuracy.,Obtained by default in Jackson - Waking Up.
+Handguns,Revolver,../Data/Images/weapon_images/Revolver.jpg,Mid-range revolver with moderate damage and slow reload speed.,Get from the box upstairs in Jackson - Packing Up.
+Handguns,Military Pistol,../Data/Images/weapon_images/Military Pistol.jpg,Short-range handgun with high fire rate and moderate accuracy.,Obtain automatically in Seattle Day 1 - The Stadium.
+Handguns,Hunting Pistol,../Data/Images/weapon_images/Hunting Pistol.jpg,Long-range handgun with high damage and slow reload speed.,Seattle Day 1 - On Foot (Safe)
+Long Guns,Bolt-Action Rifle,../Data/Images/weapon_images/Bolt-Action Rifle.jpg,Long-range rifle with high damage and slow fire rate.,Obtained by default in Jackson - Waking Up.
+Long Guns,Pump Shotgun,../Data/Images/weapon_images/Pump Shotgun.jpg,Close-range shotgun with high damage and slow reload speed.,Obtain from the Bank Vault in Seattle Day 1 - Downtown.
+Long Guns,Bow,../Data/Images/weapon_images/Bow.jpg,Long-range bow with silent shots and slow draw speed.,Obtain automatically in Seattle Day 2 - Hillcrest.
+Long Guns,Semi-Auto Rifle,../Data/Images/weapon_images/Semi-Auto Rifle.jpg,Mid-range rifle with high fire rate and moderate accuracy.,Obtain automatically in Seattle Day 1 - The Stadium.
+Long Guns,Double Barrel Shotgun,../Data/Images/weapon_images/Double Barrel Shotgun.jpg,Mid-range shotgun with high damage and slow reload speed.,Seattle Day 1 - Hostile Territory (Shop with Chinese Vase)
+Long Guns,Crossbow,../Data/Images/weapon_images/Crossbow.jpg,Long-range crossbow with silent shots and slow reload speed.,"Seattle Day 1 - The Coast (Boat, next to dead body)"
+Long Guns,Flamethrower,../Data/Images/weapon_images/Flamethrower.jpg,"Close range weapon that incinerates enemies, dealing lethal damage.",Seattle Day 2 - The Descent (near the dead Fedra agent).
+Long Guns,Silenced Submachine Gun,../Data/Images/weapon_images/Silenced Submachine Gun.jpg,A silent automatic sub machine gun that deals medium damage to enemies.,Obtained in Santa Barbara - The Resort
+Throwables,Bottle,../Data/Images/weapon_images/Bottle.jpg,A throwable object that can be used to break glass or create a distraction. Only one item of this type can be held at a time.,Pick up from ground.
+Throwables,Brick,../Data/Images/weapon_images/Brick.jpg,A throwable object that can be used to break glass or create a distraction. Only one item of this type can be held at a time.,Pick up from ground.
+Throwables,Molotov,../Data/Images/weapon_images/Molotov.jpg,"Explodes on impact, and fire lingers in the area.",Craft.
+Throwables,Stun Bomb,../Data/Images/weapon_images/Stun Bomb.jpg,Stuns enemies in a small area on impact.,Craft.
+Throwables,Trap Mine,../Data/Images/weapon_images/Trap Mine.jpg,Deploys in place and detonates on enemy proximity.,Craft.
+Throwables,Pipe Bomb,../Data/Images/weapon_images/Pipe Bomb.jpg,Bounce on impact and explodes after a short delay.,Craft.
+Melee / Other,Machete,../Data/Images/weapon_images/Machete.jpg,Increases the power of your melee attacks.,Pick-up
+Melee / Other,Hammer,../Data/Images/weapon_images/Hammer.jpg,Increases the power of your melee attacks.,Pick-up
+Melee / Other,Baton,../Data/Images/weapon_images/Baton.jpg,Increases the power of your melee attacks.,Pick-up
+Melee / Other,Pipe Wrench,../Data/Images/weapon_images/Pipe Wrench.jpg,Increases the power of your melee attacks.,Pick-up
+Melee / Other,2x4,../Data/Images/weapon_images/2x4.jpg,Increases the power of your melee attacks.,Pick-up
+Melee / Other,Axe,../Data/Images/weapon_images/Axe.jpg,Increases the power of your melee attacks.,Pick-up
+Melee / Other,Pickaxe,../Data/Images/weapon_images/Pickaxe.jpg,Increases the power of your melee attacks.,Pick-up
+Melee / Other,Pipe,../Data/Images/weapon_images/Pipe.jpg,Increases the power of your melee attacks.,Pick-up
+Melee / Other,Sickle,../Data/Images/weapon_images/Sickle.jpg,Increases the power of your melee attacks.,Pick-up
+Melee / Other,Club,../Data/Images/weapon_images/Club.jpg,Increases the power of your melee attacks.,Pick-up
+Melee / Other,Shiv,../Data/Images/weapon_images/Shiv.jpg,Instantly kills enemies from stealth and saves from clicker grabs.,Craft.
+Melee / Other,Switchblade,../Data/Images/weapon_images/Switchblade.jpg,A one-handed melee weapon used by Ellie. Replaces the use of shivs and can also be used for Stealth Kills.,Obtained by default in Jackson - Waking Up.
+Recovery,Health Kit,../Data/Images/weapon_images/Health Kit.jpg,Restores a moderate amount of health. Hold R2 to use.,Craft.
