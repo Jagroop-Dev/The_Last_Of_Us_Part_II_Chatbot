@@ -684,13 +684,13 @@ import {
 
 
 const firebaseConfig = {
-  apiKey: typeof FIREBASE_API_KEY !== 'undefined' ? FIREBASE_API_KEY : '',
-  authDomain: typeof FIREBASE_AUTH_DOMAIN !== 'undefined' ? FIREBASE_AUTH_DOMAIN : '',
-  projectId: typeof FIREBASE_PROJECT_ID !== 'undefined' ? FIREBASE_PROJECT_ID : '',
-  storageBucket: typeof FIREBASE_STORAGE_BUCKET !== 'undefined' ? FIREBASE_STORAGE_BUCKET : '',
-  messagingSenderId: typeof FIREBASE_MESSAGING_SENDER_ID !== 'undefined' ? FIREBASE_MESSAGING_SENDER_ID : '',
-  appId: typeof FIREBASE_APP_ID !== 'undefined' ? FIREBASE_APP_ID : '',
-  measurementId: typeof FIREBASE_MEASUREMENT_ID !== 'undefined' ? FIREBASE_MEASUREMENT_ID : ''
+  apiKey: "AIzaSyBXdhrPNMwr-jPWG10aY8_EMpCS2ZQEN1U",
+  authDomain: "wlf-chatbot-58449.firebaseapp.com",
+  projectId: "wlf-chatbot-58449",
+  storageBucket: "wlf-chatbot-58449.firebasestorage.app",
+  messagingSenderId: "414493982512",
+  appId: "1:414493982512:web:a45a15b19a41f9634e52f5",
+  measurementId: "G-4VXTX5LYKK"
 };
 
 
