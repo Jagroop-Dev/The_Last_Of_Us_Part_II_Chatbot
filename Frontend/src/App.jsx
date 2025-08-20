@@ -1,221 +1,245 @@
+import React, { useState, useEffect, useRef } from 'react';
 
-export default function App() {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [conversations, setConversations] = useState([]);
-  const [currentChatId, setCurrentChatId] = useState(null);
+const apiUrl = import.meta.env.VITE_API_URL;
+
+const App = () => {
+
+  const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
   const [isApiLoading, setIsApiLoading] = useState(false);
-  const [theme, setTheme] = useState('dark');
+  const [conversations, setConversations] = useState([]);
+  const [currentChatId, setCurrentChatId] = useState(null);
   const [currentPage, setCurrentPage] = useState('chat');
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [theme, setTheme] = useState('dark');
   const [settings, setSettings] = useState({
     theme: 'dark',
     fontSize: 16,
     reduceMotion: false
   });
-  const [userId, setUserId] = useState(null);
-  const [isAuthReady, setIsAuthReady] = useState(false);
+
   const messagesEndRef = useRef(null);
+  const inputRef = useRef(null);
 
 
+  const STORAGE_KEYS = {
+    conversations: 'tlou_conversations',
+    settings: 'tlou_settings',
+    currentChatId: 'tlou_current_chat_id'
+  };
 
+ 
   useEffect(() => {
-    const authUnsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        setUserId(user.uid);
-      } else {
-        await signInAnonymously(auth);
+    try {
+
+      const savedSettings = localStorage.getItem(STORAGE_KEYS.settings);
+      if (savedSettings) {
+        const parsedSettings = JSON.parse(savedSettings);
+        setSettings(parsedSettings);
+        setTheme(parsedSettings.theme);
       }
-      setIsAuthReady(true);
-    });
 
-    return () => authUnsubscribe();
-  }, []);
+   
+      const savedConversations = localStorage.getItem(STORAGE_KEYS.conversations);
+      if (savedConversations) {
+        const parsedConversations = JSON.parse(savedConversations);
+        setConversations(parsedConversations);
+      }
 
-
-  useEffect(() => {
-    if (!isAuthReady || !userId) return;
-
-
-    const q = query(
-      collection(db, `users/${userId}/conversations`),
-      orderBy("createdAt", "desc")
-    );
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const convs = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-
-      setConversations(convs);
-
-
-      if (convs.length === 0) {
-        const newChatRef = doc(collection(db, `users/${userId}/conversations`));
-        const newChatId = newChatRef.id;
-        setDoc(newChatRef, {
-          name: 'New Chat',
-          createdAt: serverTimestamp(),
-          messages: [],
-        });
-        setCurrentChatId(newChatId);
-      } else {
-
-        if (!convs.some(c => c.id === currentChatId)) {
-          setCurrentChatId(convs[0]?.id || null);
+      const savedCurrentChatId = localStorage.getItem(STORAGE_KEYS.currentChatId);
+      if (savedCurrentChatId && savedConversations) {
+        const parsedConversations = JSON.parse(savedConversations);
+        const chatExists = parsedConversations.find(conv => conv.id === savedCurrentChatId);
+        if (chatExists) {
+          setCurrentChatId(savedCurrentChatId);
+          setMessages(chatExists.messages || []);
         }
       }
-    });
 
-    return () => unsubscribe();
-  }, [isAuthReady, userId]);
+     
+      if (!savedConversations || JSON.parse(savedConversations).length === 0) {
+        handleNewChat();
+      }
+    } catch (error) {
+      console.error('Error loading data from localStorage:', error);
+      handleNewChat();
+    }
+  }, []);
+
+ 
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, isApiLoading]);
+
+  
+  useEffect(() => {
+    if (conversations.length > 0) {
+      localStorage.setItem(STORAGE_KEYS.conversations, JSON.stringify(conversations));
+    }
+  }, [conversations]);
 
 
   useEffect(() => {
-    if (!currentChatId || !userId) return;
+    if (currentChatId) {
+      localStorage.setItem(STORAGE_KEYS.currentChatId, currentChatId);
+    }
+  }, [currentChatId]);
 
-    const chatDocRef = doc(db, `users/${userId}/conversations/${currentChatId}`);
+ 
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.settings, JSON.stringify(settings));
+  }, [settings]);
 
-    const unsubscribe = onSnapshot(chatDocRef, (doc) => {
-      if (doc.exists()) {
-        const chatData = doc.data();
-        setConversations(prevConversations =>
-          prevConversations.map(conv =>
-            conv.id === currentChatId ? { ...conv, messages: chatData.messages || [] } : conv
-          )
-        );
+ 
+  const generateUniqueId = () => {
+    return 'id-' + Date.now() + '-' + Math.random().toString(16).slice(2);
+  };
+
+
+  const handleNewChat = () => {
+    const newChatId = generateUniqueId();
+    const newChat = {
+      id: newChatId,
+      name: 'New Conversation',
+      messages: [],
+      createdAt: new Date().toISOString()
+    };
+
+    setConversations(prev => [newChat, ...prev]);
+    setCurrentChatId(newChatId);
+    setMessages([]);
+    setCurrentPage('chat');
+    setIsSidebarOpen(false);
+  };
+
+
+  const handleSelectChat = (chatId) => {
+    const selectedChat = conversations.find(conv => conv.id === chatId);
+    if (selectedChat) {
+      setCurrentChatId(chatId);
+      setMessages(selectedChat.messages || []);
+      setCurrentPage('chat');
+      setIsSidebarOpen(false);
+    }
+  };
+
+  
+  const handleDeleteChat = (chatId) => {
+    setConversations(prev => prev.filter(conv => conv.id !== chatId));
+    
+    if (currentChatId === chatId) {
+      const remainingConversations = conversations.filter(conv => conv.id !== chatId);
+      if (remainingConversations.length > 0) {
+        handleSelectChat(remainingConversations[0].id);
+      } else {
+        handleNewChat();
       }
-    });
-
-    return () => unsubscribe();
-  }, [currentChatId, userId]);
-
-
-
-
-
-
-  const updateSettings = (key, value) => {
-    setSettings(prev => ({ ...prev, [key]: value }));
-    if (key === 'theme') {
-      setTheme(value);
     }
   };
 
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: settings.reduceMotion ? "auto" : "smooth" });
+  const handleEditTitle = (chatId, newTitle) => {
+    setConversations(prev => prev.map(conv => 
+      conv.id === chatId ? { ...conv, name: newTitle } : conv
+    ));
   };
 
-  useEffect(scrollToBottom, [conversations]);
+ 
+  const updateSettings = (key, value) => {
+    setSettings(prev => {
+      const newSettings = { ...prev, [key]: value };
+      if (key === 'theme') {
+        setTheme(value);
+      }
+      return newSettings;
+    });
+  };
 
-
-  const currentChat = conversations.find(chat => chat.id === currentChatId);
-
-
+ 
   const handleSendMessage = async (e) => {
-    e.preventDefault();
-    if (!newMessage.trim() || isApiLoading || !currentChatId || !userId) return;
+    if (e) e.preventDefault();
+    if (!newMessage.trim() || isApiLoading) return;
 
-    setIsApiLoading(true);
     const userMessage = {
-      id: generateUniqueId(),
+      id: Date.now(),
       text: newMessage,
       sender: 'user',
       timestamp: new Date().toISOString()
     };
 
-
-    setConversations(prev => prev.map(conv =>
-      conv.id === currentChatId ? { ...conv, messages: [...conv.messages, userMessage] } : conv
-    ));
+    
+    const updatedMessages = [...messages, userMessage];
+    setMessages(updatedMessages);
     setNewMessage('');
+    setIsApiLoading(true);
+
+   
+    setConversations(prev => prev.map(conv => 
+      conv.id === currentChatId 
+        ? { ...conv, messages: updatedMessages, name: conv.name === 'New Conversation' ? userMessage.text.slice(0, 50) + '...' : conv.name }
+        : conv
+    ));
 
     try {
-
-      const chatDocRef = doc(db, `users/${userId}/conversations/${currentChatId}`);
-      await setDoc(chatDocRef, {
-        messages: [...(currentChat?.messages || []), userMessage],
-      }, { merge: true });
-
-      const response = await fetch('https://wlf-chatbot.nw.r.appspot.com', {
+      const response = await fetch(apiUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: userMessage.text })
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ query: userMessage.text }),
       });
+
+      if (!response.ok) {
+        throw new Error(`API call failed with status: ${response.status}`);
+      }
 
       const data = await response.json();
       const botMessage = {
-        id: generateUniqueId(),
+        id: Date.now() + 1,
         text: data.answer,
         sender: 'bot',
-        timestamp: new Date().toISOString(),
-        images: data.images
+        timestamp: new Date().toISOString()
       };
 
+      const finalMessages = [...updatedMessages, botMessage];
+      setMessages(finalMessages);
 
-      await setDoc(chatDocRef, {
-        messages: [...(currentChat?.messages || []), userMessage, botMessage],
-      }, { merge: true });
+      
+      setConversations(prev => prev.map(conv => 
+        conv.id === currentChatId 
+          ? { ...conv, messages: finalMessages }
+          : conv
+      ));
 
     } catch (error) {
-      console.error("Error sending message:", error);
+      console.error("Failed to send message or get bot response:", error);
       const errorMessage = {
-        id: generateUniqueId(),
+        id: Date.now() + 1,
         text: "Sorry, I'm having trouble connecting right now. Please try again later.",
         sender: 'bot',
         timestamp: new Date().toISOString()
       };
-      const chatDocRef = doc(db, `users/${userId}/conversations/${currentChatId}`);
-      await setDoc(chatDocRef, {
-        messages: [...(currentChat?.messages || []), userMessage, errorMessage],
-      }, { merge: true });
+
+      const finalMessages = [...updatedMessages, errorMessage];
+      setMessages(finalMessages);
+
+     
+      setConversations(prev => prev.map(conv => 
+        conv.id === currentChatId 
+          ? { ...conv, messages: finalMessages }
+          : conv
+      ));
     } finally {
       setIsApiLoading(false);
     }
   };
 
 
-
-  const handleNewChat = () => {
-    const newChat = { id: generateUniqueId(), name: 'New Chat', messages: [] };
-    setConversations([newChat, ...conversations]);
-    setCurrentChatId(newChat.id);
-    setCurrentPage('chat');
-  };
-
-
-  const handleSelectChat = (chatId) => {
-    setCurrentChatId(chatId);
-    setCurrentPage('chat');
-    setIsSidebarOpen(false);
-  };
-
-
-  const handleDeleteChat = (chatId) => {
-    const remainingChats = conversations.filter(chat => chat.id !== chatId);
-
-    if (remainingChats.length === 0) {
-      handleNewChat();
-    } else {
-      setConversations(remainingChats);
-      if (chatId === currentChatId) {
-        setCurrentChatId(remainingChats[0].id);
-      }
-    }
-  };
-
-
-  const handleEditTitle = (chatId, newName) => {
-    if (newName.trim() === '') return;
-    setConversations(conversations.map(chat =>
-      chat.id === chatId ? { ...chat, name: newName } : chat
-    ));
-  };
+  const currentChat = conversations.find(conv => conv.id === currentChatId);
 
 
   const toggleTheme = () => {
     const newTheme = theme === 'dark' ? 'light' : 'dark';
-    setTheme(newTheme);
     updateSettings('theme', newTheme);
   };
 
@@ -230,11 +254,16 @@ export default function App() {
         onEdit(chat.id, title);
         setIsEditing(false);
       }
+      if (e.key === 'Escape') {
+        setTitle(chat.name);
+        setIsEditing(false);
+      }
     };
 
     useEffect(() => {
       if (isEditing) {
         inputRef.current?.focus();
+        inputRef.current?.select();
       }
     }, [isEditing]);
 
@@ -243,7 +272,7 @@ export default function App() {
     return (
       <div
         className={`group relative flex items-center gap-3 p-3 rounded-lg cursor-pointer ${settings.reduceMotion ? '' : 'transition-all duration-200'} focus-within:ring-2 focus-within:ring-offset-2
-          ${isActive
+            ${isActive
             ? theme === 'dark'
               ? 'bg-blue-500/20 backdrop-blur-sm border border-blue-400/30 focus-within:ring-blue-500'
               : 'bg-blue-600/20 backdrop-blur-sm border border-blue-400/30 focus-within:ring-blue-500'
@@ -267,12 +296,12 @@ export default function App() {
             }}
             onKeyDown={handleKeyDown}
             className={`flex-1 bg-transparent outline-none text-sm font-medium
-              ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}
+                ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}
             aria-label="Edit chat name"
           />
         ) : (
           <span className={`flex-1 text-sm font-medium truncate
-            ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+              ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
             {chat.name}
           </span>
         )}
@@ -281,7 +310,7 @@ export default function App() {
           <button
             onClick={(e) => { e.stopPropagation(); setIsEditing(true); }}
             className={`p-1.5 rounded-md ${settings.reduceMotion ? '' : 'transition-colors'} focus:outline-none focus:ring-2 focus:ring-offset-1
-              ${theme === 'dark' ? 'hover:bg-slate-600/40 focus:ring-slate-500' : 'hover:bg-gray-300/60 focus:ring-gray-400'}`}
+                ${theme === 'dark' ? 'hover:bg-slate-600/40 focus:ring-slate-500' : 'hover:bg-gray-300/60 focus:ring-gray-400'}`}
             aria-label="Edit chat"
           >
             <PencilIcon className={theme === 'dark' ? 'text-white' : 'text-gray-900'} />
@@ -289,7 +318,7 @@ export default function App() {
           <button
             onClick={(e) => { e.stopPropagation(); onDelete(chat.id); }}
             className={`p-1.5 rounded-md ${settings.reduceMotion ? '' : 'transition-colors'} focus:outline-none focus:ring-2 focus:ring-offset-1
-              ${theme === 'dark' ? 'hover:bg-red-500/20 text-red-400 focus:ring-red-500' : 'hover:bg-red-100 text-red-600 focus:ring-red-500'}`}
+                ${theme === 'dark' ? 'hover:bg-red-500/20 text-red-400 focus:ring-red-500' : 'hover:bg-red-100 text-red-600 focus:ring-red-500'}`}
             aria-label="Delete chat"
           >
             <TrashIcon />
@@ -299,14 +328,14 @@ export default function App() {
     );
   };
 
-
+  
   const NavItem = ({ icon, label, page, onClick }) => {
     const isActive = currentPage === page;
     return (
       <button
         onClick={onClick}
         className={`flex items-center gap-3 w-full p-3 rounded-lg ${settings.reduceMotion ? '' : 'transition-all duration-200'} focus:outline-none focus:ring-2 focus:ring-offset-2
-          ${isActive
+            ${isActive
             ? theme === 'dark'
               ? 'bg-blue-500/20 border border-blue-400/30 focus:ring-blue-500'
               : 'bg-blue-600/20 border border-blue-400/30 focus:ring-blue-500'
@@ -318,12 +347,13 @@ export default function App() {
       >
         <span className={theme === 'dark' ? 'text-white' : 'text-gray-900'}>{icon}</span>
         <span className={`text-sm font-medium
-          ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+            ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
           {label}
         </span>
       </button>
     );
   };
+
 
   const renderMainContent = () => {
     if (currentPage === 'trophies') {
@@ -338,37 +368,36 @@ export default function App() {
       return <SettingsPage theme={theme} settings={settings} updateSettings={updateSettings} />;
     }
 
-
     return (
       <>
         {/* Messages */}
         <main className="flex-1 overflow-y-auto" style={{ fontSize: `${settings.fontSize}px` }}>
-          {currentChat?.messages.length === 0 ? (
+          {(!currentChat || currentChat.messages.length === 0) ? (
             <div className="flex items-center justify-center h-full p-8">
               <div className="text-center max-w-2xl">
                 <div className={`w-16 h-16 mx-auto mb-6 rounded-2xl flex items-center justify-center backdrop-blur-xl border shadow-lg
-                  ${theme === 'dark' ? 'bg-blue-500/20 border-blue-400/30' : 'bg-blue-600/10 border-blue-400/30'}`}>
+                    ${theme === 'dark' ? 'bg-blue-500/20 border-blue-400/30' : 'bg-blue-600/10 border-blue-400/30'}`}>
                   <BotIcon className={theme === 'dark' ? 'text-blue-400' : 'text-blue-600'} />
                 </div>
                 <h3 className={`text-2xl font-bold mb-3
-                  ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                    ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
                   Welcome to The Last of Us Part 2 Bot
                 </h3>
                 <p className={`text-lg leading-relaxed
-                  ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
+                    ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
                   Ask me anything about the world of The Last of Us Part 2. I can discuss characters, storylines, gameplay, and the post-apocalyptic world that Ellie and Abby navigate.
                 </p>
               </div>
             </div>
           ) : (
             <div className="max-w-4xl mx-auto p-6 space-y-6">
-              {currentChat?.messages.map((message) => {
+              {messages.map((message) => {
                 const isImage = message.type === 'image';
 
                 return (
                   <div key={message.id} className={`flex gap-4 ${message.sender === 'user' ? 'flex-row-reverse' : ''}`}>
                     <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center
-        ${message.sender === 'user' ? 'bg-emerald-600' : 'bg-blue-600'}`}>
+          ${message.sender === 'user' ? 'bg-emerald-600' : 'bg-blue-600'}`}>
                       {message.sender === 'user' ? (
                         <UserCircleIcon className="w-5 h-5 text-white" />
                       ) : (
@@ -376,7 +405,13 @@ export default function App() {
                       )}
                     </div>
                     <div className={`flex-1 max-w-3xl p-4 rounded-2xl relative backdrop-blur-xl border shadow-lg
-       ${message.sender === 'user' ? 'bg-emerald-600/20 border-emerald-400/30 text-white' : 'bg-blue-600/20 border-blue-400/30 text-gray-900'}`}>
+         ${message.sender === 'user' 
+           ? theme === 'dark' 
+             ? 'bg-emerald-600/20 border-emerald-400/30 text-white' 
+             : 'bg-emerald-600/20 border-emerald-400/30 text-gray-900'
+           : theme === 'dark'
+             ? 'bg-blue-600/20 border-blue-400/30 text-white'
+             : 'bg-blue-600/20 border-blue-400/30 text-gray-900'}`}>
                       {isImage ? (
                         <img src={message.src} alt="Relevant image" className="mt-4 rounded-lg w-full max-h-64 object-contain" />
                       ) : (
@@ -387,25 +422,23 @@ export default function App() {
                 );
               })}
 
-
-
               {isApiLoading && (
                 <div className="flex gap-4">
                   <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center
-                    ${theme === 'dark' ? 'bg-blue-500/20 backdrop-blur-sm' : 'bg-emerald-500/10 backdrop-blur-sm'}`}>
+                      ${theme === 'dark' ? 'bg-blue-500/20 backdrop-blur-sm' : 'bg-emerald-500/10 backdrop-blur-sm'}`}>
                     <BotIcon className={`w-5 h-5 ${theme === 'dark' ? 'text-blue-400' : 'text-emerald-600'}`} />
                   </div>
                   <div className={`flex-1 max-w-3xl p-4 rounded-2xl backdrop-blur-xl border shadow-lg
-                    ${theme === 'dark'
+                      ${theme === 'dark'
                       ? 'bg-slate-800/50 border-slate-600/30'
                       : 'bg-white/80 border-gray-300/30'}`}>
                     <div className="flex items-center gap-2">
                       <div className={`w-2 h-2 rounded-full ${settings.reduceMotion ? 'bg-gray-400' : 'animate-bounce bg-gray-400'}
-                        ${theme === 'dark' ? 'bg-gray-300' : 'bg-gray-600'}`} style={{ animationDelay: '0ms' }} />
+                          ${theme === 'dark' ? 'bg-gray-300' : 'bg-gray-600'}`} style={{ animationDelay: '0ms' }} />
                       <div className={`w-2 h-2 rounded-full ${settings.reduceMotion ? 'bg-gray-400' : 'animate-bounce bg-gray-400'}
-                        ${theme === 'dark' ? 'bg-gray-300' : 'bg-gray-600'}`} style={{ animationDelay: '150ms' }} />
+                          ${theme === 'dark' ? 'bg-gray-300' : 'bg-gray-600'}`} style={{ animationDelay: '150ms' }} />
                       <div className={`w-2 h-2 rounded-full ${settings.reduceMotion ? 'bg-gray-400' : 'animate-bounce bg-gray-400'}
-                        ${theme === 'dark' ? 'bg-gray-300' : 'bg-gray-600'}`} style={{ animationDelay: '300ms' }} />
+                          ${theme === 'dark' ? 'bg-gray-300' : 'bg-gray-600'}`} style={{ animationDelay: '300ms' }} />
                     </div>
                   </div>
                 </div>
@@ -419,8 +452,8 @@ export default function App() {
         {/* Input Area */}
         <div className="p-6">
           <div className="max-w-4xl mx-auto">
-            <div className={`flex items-center gap-3 p-3 rounded-2xl backdrop-blur-xl border shadow-lg ${settings.reduceMotion ? '' : 'transition-all duration-200'}
-              ${theme === 'dark'
+            <form onSubmit={handleSendMessage} className={`flex items-center gap-3 p-3 rounded-2xl backdrop-blur-xl border shadow-lg ${settings.reduceMotion ? '' : 'transition-all duration-200'}
+                ${theme === 'dark'
                 ? 'bg-slate-800/50 border-slate-600/30'
                 : 'bg-white/80 border-gray-300/30'}`}>
 
@@ -436,7 +469,7 @@ export default function App() {
                 placeholder="Ask about The Last of Us Part 2..."
                 rows={1}
                 className={`flex-1 bg-transparent resize-none outline-none leading-6 py-2
-                  ${theme === 'dark' ? 'text-white placeholder:text-gray-400' : 'text-gray-900 placeholder:text-gray-600'}`}
+                    ${theme === 'dark' ? 'text-white placeholder:text-gray-400' : 'text-gray-900 placeholder:text-gray-600'}`}
                 style={{
                   minHeight: '24px',
                   maxHeight: '120px',
@@ -450,10 +483,10 @@ export default function App() {
               />
 
               <button
-                onClick={handleSendMessage}
+                type="submit"
                 disabled={!newMessage.trim() || isApiLoading}
                 className={`flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center ${settings.reduceMotion ? '' : 'transition-all duration-200'} focus:outline-none focus:ring-2 focus:ring-offset-2
-                  ${!newMessage.trim() || isApiLoading
+                    ${!newMessage.trim() || isApiLoading
                     ? theme === 'dark'
                       ? 'bg-slate-700 text-slate-500 cursor-not-allowed'
                       : 'bg-gray-300 text-gray-500 cursor-not-allowed'
@@ -465,7 +498,7 @@ export default function App() {
               >
                 <SendIcon />
               </button>
-            </div>
+            </form>
           </div>
         </div>
       </>
@@ -474,30 +507,30 @@ export default function App() {
 
   return (
     <div className={`flex min-h-screen ${settings.reduceMotion ? '' : 'transition-colors duration-300'}
-      ${theme === 'dark'
+        ${theme === 'dark'
         ? 'bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900'
         : 'bg-gradient-to-br from-blue-50 via-indigo-50 to-emerald-50'}`}>
 
       {/* Sidebar */}
       <div className={`
-        ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
-        fixed inset-y-0 left-0 z-50 w-80 ${settings.reduceMotion ? '' : 'transition-transform duration-300 ease-in-out'}
-        lg:relative lg:translate-x-0 lg:w-80
-        ${theme === 'dark'
+          ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+          fixed inset-y-0 left-0 z-50 w-80 ${settings.reduceMotion ? '' : 'transition-transform duration-300 ease-in-out'}
+          lg:relative lg:translate-x-0 lg:w-80
+          ${theme === 'dark'
           ? 'bg-slate-900/95 backdrop-blur-xl border-r border-slate-700/50'
           : 'bg-white/95 backdrop-blur-xl border-r border-gray-300/50'}
-      `}>
+        `}>
 
         {/* Sidebar Header */}
         <div className={`flex items-center justify-between p-4 border-b backdrop-blur-sm
-          ${theme === 'dark' ? 'border-slate-700/50' : 'border-gray-300/50'}`}>
+            ${theme === 'dark' ? 'border-slate-700/50' : 'border-gray-300/50'}`}>
           <div className="flex items-center gap-3">
             <div className={`w-8 h-8 rounded-lg flex items-center justify-center backdrop-blur-sm
-              ${theme === 'dark' ? 'bg-blue-500/20' : 'bg-blue-600/10'}`}>
+                ${theme === 'dark' ? 'bg-blue-500/20' : 'bg-blue-600/10'}`}>
               <span className={`font-bold text-sm ${theme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`}>TLoU</span>
             </div>
             <h1 className={`font-bold text-lg
-              ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
               The Last of Us
             </h1>
           </div>
@@ -506,7 +539,7 @@ export default function App() {
             <button
               onClick={toggleTheme}
               className={`p-2 rounded-lg ${settings.reduceMotion ? '' : 'transition-colors'} focus:outline-none focus:ring-2 focus:ring-offset-2
-                ${theme === 'dark'
+                  ${theme === 'dark'
                   ? 'hover:bg-slate-700/40 text-yellow-400 focus:ring-yellow-500'
                   : 'hover:bg-gray-200/60 text-gray-700 focus:ring-gray-400'}`}
               aria-label="Toggle theme"
@@ -517,7 +550,7 @@ export default function App() {
             <button
               onClick={handleNewChat}
               className={`p-2 rounded-lg ${settings.reduceMotion ? '' : 'transition-colors'} focus:outline-none focus:ring-2 focus:ring-offset-2
-                ${theme === 'dark'
+                  ${theme === 'dark'
                   ? 'hover:bg-slate-700/40 text-white focus:ring-slate-500'
                   : 'hover:bg-gray-200/60 text-gray-700 focus:ring-gray-400'}`}
               aria-label="New chat"
@@ -529,7 +562,7 @@ export default function App() {
 
         {/* Navigation */}
         <div className={`p-4 space-y-2 border-b backdrop-blur-sm
-          ${theme === 'dark' ? 'border-slate-700/50' : 'border-gray-300/50'}`}>
+            ${theme === 'dark' ? 'border-slate-700/50' : 'border-gray-300/50'}`}>
           <NavItem
             icon={<ChatDotsIcon />}
             label="Chat"
@@ -579,7 +612,7 @@ export default function App() {
 
         {/* Sidebar Footer */}
         <div className={`p-4 border-t backdrop-blur-sm
-          ${theme === 'dark' ? 'border-slate-700/50' : 'border-gray-300/50'}`}>
+            ${theme === 'dark' ? 'border-slate-700/50' : 'border-gray-300/50'}`}>
           <NavItem
             icon={<GearIcon />}
             label="Settings"
@@ -590,7 +623,7 @@ export default function App() {
             }}
           />
           <div className={`text-xs text-center mt-4
-            ${theme === 'dark' ? 'text-gray-500' : 'text-gray-600'}`}>
+              ${theme === 'dark' ? 'text-gray-500' : 'text-gray-600'}`}>
             The Last of Us Part 2 Assistant
           </div>
         </div>
@@ -601,7 +634,7 @@ export default function App() {
 
         {/* Header */}
         <header className={`flex items-center justify-between p-4 border-b backdrop-blur-xl
-          ${theme === 'dark'
+            ${theme === 'dark'
             ? 'bg-slate-800/40 border-slate-700/50'
             : 'bg-white/60 border-gray-300/50'}`}>
 
@@ -609,7 +642,7 @@ export default function App() {
             <button
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
               className={`lg:hidden p-2 rounded-lg ${settings.reduceMotion ? '' : 'transition-colors'} focus:outline-none focus:ring-2 focus:ring-offset-2
-                ${theme === 'dark'
+                  ${theme === 'dark'
                   ? 'hover:bg-slate-700/40 text-white focus:ring-slate-500'
                   : 'hover:bg-gray-200/60 text-gray-700 focus:ring-gray-400'}`}
               aria-label="Toggle sidebar"
@@ -618,7 +651,7 @@ export default function App() {
             </button>
 
             <h2 className={`font-semibold text-lg
-              ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
               {currentPage === 'chat'
                 ? currentChat?.name || 'Loading...'
                 : currentPage === 'trophies'
@@ -644,73 +677,22 @@ export default function App() {
 
       {/* Custom Styles */}
       <style jsx>{`
-        @keyframes pulse-glow {
-          0%, 100% { 
-            box-shadow: 0 0 5px ${theme === 'dark' ? 'rgba(16, 185, 129, 0.3)' : 'rgba(37, 99, 235, 0.3)'};
+          @keyframes pulse-glow {
+            0%, 100% { 
+              box-shadow: 0 0 5px ${theme === 'dark' ? 'rgba(16, 185, 129, 0.3)' : 'rgba(37, 99, 235, 0.3)'};
+            }
+            50% { 
+              box-shadow: 0 0 20px ${theme === 'dark' ? 'rgba(16, 185, 129, 0.5)' : 'rgba(37, 99, 235, 0.5)'}, 
+                          0 0 30px ${theme === 'dark' ? 'rgba(16, 185, 129, 0.3)' : 'rgba(37, 99, 235, 0.3)'};
+            }
           }
-          50% { 
-            box-shadow: 0 0 20px ${theme === 'dark' ? 'rgba(16, 185, 129, 0.5)' : 'rgba(37, 99, 235, 0.5)'}, 
-                        0 0 30px ${theme === 'dark' ? 'rgba(16, 185, 129, 0.3)' : 'rgba(37, 99, 235, 0.3)'};
+          
+          .animate-pulse-glow {
+            animation: ${settings.reduceMotion ? 'none' : 'pulse-glow 4s ease-in-out infinite'};
           }
-        }
-        
-        .animate-pulse-glow {
-          animation: ${settings.reduceMotion ? 'none' : 'pulse-glow 4s ease-in-out infinite'};
-        }
-      `}</style>
+        `}</style>
     </div>
   );
-} import { useState, useRef, useEffect } from 'react';
-
-import { initializeApp } from 'firebase/app';
-import {
-  getAuth,
-  signInAnonymously,
-  onAuthStateChanged,
-} from 'firebase/auth';
-import {
-  getFirestore,
-  doc,
-  setDoc,
-  collection,
-  query,
-  onSnapshot,
-  orderBy,
-  addDoc,
-  getDoc,
-  serverTimestamp,
-} from 'firebase/firestore';
-
-
-
-const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
-};
-
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-const auth = getAuth(app);
-
-signInAnonymously(auth)
-  .then(() => {
-    // Signed in successfully
-    console.log("Successfully signed in anonymously.");
-  })
-  .catch((error) => {
-    // Handle Errors here.
-    const errorCode = error.code;
-    const errorMessage = error.message;
-    console.error(`Error signing in: ${errorCode} - ${errorMessage}`);
-  });
-
-const generateUniqueId = () => {
-  return 'id-' + Date.now() + '-' + Math.random().toString(16).slice(2);
 };
 
 
@@ -1004,38 +986,52 @@ const SettingsPage = ({ theme, settings, updateSettings }) => {
 
 
 const TrophyPage = ({ theme, settings }) => {
-  const [trophies, setTrophies] = useState([
-    { id: 1, name: "Every Last One of Them", description: "Collect all trophies", unlocked: false, rarity: "Ultra Rare" },
 
-    { id: 2, name: "What I Had to Do", description: "Complete the story", unlocked: false, rarity: "Very Rare" },
-    { id: 3, name: "Survival Expert", description: "Learn all player upgrades", unlocked: false, rarity: "Very Rare" },
-    { id: 4, name: "Arms Master", description: "Fully upgrade all weapons", unlocked: false, rarity: "Very Rare" },
-    { id: 5, name: "Archivist", description: "Find all artifacts and journal entries", unlocked: false, rarity: "Very Rare" },
-    { id: 6, name: "Master Set", description: "Find all trading cards", unlocked: false, rarity: "Very Rare" },
-    { id: 7, name: "Numismatist", description: "Find all coins", unlocked: false, rarity: "Very Rare" },
-    { id: 8, name: "Prepared For the Worst", description: "Find all workbenches", unlocked: false, rarity: "Very Rare" },
+  const [trophies, setTrophies] = useState(() => {
+    try {
+      const saved = localStorage.getItem('tlou_trophies');
+      if (saved) {
+        return JSON.parse(saved);
+      }
+    } catch (error) {
+      console.error('Error loading trophies from localStorage:', error);
+    }
+    
+    
+    return [
+      { id: 1, name: "Every Last One of Them", description: "Collect all trophies", unlocked: false, rarity: "Ultra Rare" },
+      { id: 2, name: "What I Had to Do", description: "Complete the story", unlocked: false, rarity: "Very Rare" },
+      { id: 3, name: "Survival Expert", description: "Learn all player upgrades", unlocked: false, rarity: "Very Rare" },
+      { id: 4, name: "Arms Master", description: "Fully upgrade all weapons", unlocked: false, rarity: "Very Rare" },
+      { id: 5, name: "Archivist", description: "Find all artifacts and journal entries", unlocked: false, rarity: "Very Rare" },
+      { id: 6, name: "Master Set", description: "Find all trading cards", unlocked: false, rarity: "Very Rare" },
+      { id: 7, name: "Numismatist", description: "Find all coins", unlocked: false, rarity: "Very Rare" },
+      { id: 8, name: "Prepared For the Worst", description: "Find all workbenches", unlocked: false, rarity: "Very Rare" },
+      { id: 9, name: "Mechanist", description: "Fully upgrade a weapon", unlocked: false, rarity: "Rare" },
+      { id: 10, name: "Specialist", description: "Learn all player upgrades in one branch", unlocked: false, rarity: "Rare" },
+      { id: 11, name: "Safecracker", description: "Unlock every safe", unlocked: false, rarity: "Rare" },
+      { id: 12, name: "Sightseer", description: "Visit every location in downtown Seattle", unlocked: false, rarity: "Rare" },
+      { id: 13, name: "Journeyman", description: "Find all training manuals", unlocked: false, rarity: "Rare" },
+      { id: 14, name: "Survival Training", description: "Learn 25 player upgrades", unlocked: false, rarity: "Rare" },
+      { id: 15, name: "High Caliber", description: "Find all weapons", unlocked: false, rarity: "Rare" },
+      { id: 16, name: "In the Field", description: "Find 12 workbenches", unlocked: false, rarity: "Rare" },
+      { id: 17, name: "Tools of the Trade", description: "Craft every item", unlocked: false, rarity: "Common" },
+      { id: 18, name: "Tinkerer", description: "Upgrade a weapon", unlocked: false, rarity: "Common" },
+      { id: 19, name: "Apprentice", description: "Learn a player upgrade", unlocked: false, rarity: "Common" },
+      { id: 20, name: "Starter Set", description: "Find 5 trading cards", unlocked: false, rarity: "Common" },
+      { id: 21, name: "Mint Condition", description: "Find 5 coins", unlocked: false, rarity: "Common" },
+      { id: 22, name: "Relic of the Sages", description: "Find the Strange Artifact", unlocked: false, rarity: "Common" },
+      { id: 23, name: "So Great and Small", description: "Find the Engraved Ring", unlocked: false, rarity: "Common" },
+      { id: 24, name: "Looks Good On You", description: "Put a hat on your companion", unlocked: false, rarity: "Common" },
+      { id: 25, name: "Sharpshooter", description: "Win the marksmanship competition", unlocked: false, rarity: "Common" },
+      { id: 26, name: "Put My Name Up", description: "Earn the highscore in the archery game", unlocked: false, rarity: "Common" },
+    ];
+  });
 
-    { id: 9, name: "Mechanist", description: "Fully upgrade a weapon", unlocked: false, rarity: "Rare" },
-    { id: 10, name: "Specialist", description: "Learn all player upgrades in one branch", unlocked: false, rarity: "Rare" },
-    { id: 11, name: "Safecracker", description: "Unlock every safe", unlocked: false, rarity: "Rare" },
-    { id: 12, name: "Sightseer", description: "Visit every locaiton in downtown Seattle", unlocked: false, rarity: "Rare" },
-    { id: 13, name: "Journeyman", description: "Find all training manuals", unlocked: false, rarity: "Rare" },
-    { id: 14, name: "Survival Training", description: "Learn 25 player upgrades", unlocked: false, rarity: "Rare" },
-    { id: 15, name: "High Caliber", description: "Find all weapons", unlocked: false, rarity: "Rare" },
-    { id: 16, name: "In the Field", description: "Find 12 workbenches", unlocked: false, rarity: "Rare" },
-
-    { id: 17, name: "Tools of the Trade", description: "Craft every item", unlocked: false, rarity: "Common" },
-    { id: 18, name: "Tinkerer", description: "Upgrade a weapon", unlocked: false, rarity: "Common" },
-    { id: 19, name: "Apprentice", description: "Learn a player upgrade", unlocked: false, rarity: "Common" },
-    { id: 20, name: "Starter Set", description: "Find 5 trading cards", unlocked: false, rarity: "Common" },
-    { id: 21, name: "Mint Condition", description: "Find 5 coins", unlocked: false, rarity: "Common" },
-    { id: 22, name: "Relic of the Sages", description: "Find the Strange Artifact", unlocked: false, rarity: "Common" },
-    { id: 23, name: "So Great and Small", description: "Find the Engraved Ring", unlocked: false, rarity: "Common" },
-
-    { id: 24, name: "Looks Good On You", description: "Put a hat on your companioin", unlocked: false, rarity: "Common" },
-    { id: 25, name: "Sharpshooter", description: "Win the marksmanship competition", unlocked: false, rarity: "Common" },
-    { id: 26, name: "Put My Name Up", description: "Earn the highscore in the archery game", unlocked: false, rarity: "Common" },
-  ]);
+  
+  React.useEffect(() => {
+    localStorage.setItem('tlou_trophies', JSON.stringify(trophies));
+  }, [trophies]);
 
   const toggleTrophy = (id) => {
     setTrophies(prev => prev.map(trophy =>
@@ -1158,243 +1154,56 @@ const TrophyPage = ({ theme, settings }) => {
 
 
 const CollectiblesPage = ({ theme, settings }) => {
-  const [collectibles, setCollectibles] = useState([
-    { id: 1, category: "Artifact", name: "Volunteer Request", found: false },
-    { id: 2, category: "Artifact", name: "Letter from Seth", found: false },
-    { id: 3, category: "Artifact", name: "A Note to Santa", found: false },
-    { id: 4, category: "Artifact", name: "Supermarket Apology", found: false },
-    { id: 5, category: "Artifact", name: "Good Boy Combo", found: false },
-    { id: 6, category: "Artifact", name: "Eugene's Firefly Pendant", found: false },
-    { id: 7, category: "Artifact", name: "Photo of Eugene and Tommy", found: false },
-    { id: 8, category: "Artifact", name: "Eugene's Ultimatum", found: false },
-    { id: 9, category: "Artifact", name: "Joel's Watch", found: false },
-    { id: 10, category: "Artifact", name: "Map of Seattle", found: false },
-    { id: 11, category: "Artifact", name: "Refugee Note", found: false },
-    { id: 12, category: "Artifact", name: "Infected Infographic", found: false },
-    { id: 13, category: "Artifact", name: "Isaac's Orders", found: false },
-    { id: 14, category: "Artifact", name: "Checkpoint Gate Codes", found: false },
-    { id: 15, category: "Artifact", name: "Rooftop Note", found: false },
-    { id: 16, category: "Artifact", name: "FEDRA Census Document", found: false },
-    { id: 17, category: "Artifact", name: "Cache Hunter Note", found: false },
-    { id: 18, category: "Artifact", name: "Street Drawing", found: false },
-    { id: 19, category: "Artifact", name: "Emergency Protocols Memo", found: false },
-    { id: 20, category: "Artifact", name: "Rabbi Saunders' Letter", found: false },
-    { id: 21, category: "Artifact", name: "Letter from Isaac", found: false },
-    { id: 22, category: "Artifact", name: "Bank Heist Plans", found: false },
-    { id: 23, category: "Artifact", name: "Engraved Ring", found: false },
-    { id: 24, category: "Artifact", name: "Bank Robber Letter", found: false },
-    { id: 25, category: "Artifact", name: "Note to Informant", found: false },
-    { id: 26, category: "Artifact", name: "WLF Community Supply Chest Note", found: false },
-    { id: 27, category: "Artifact", name: "WLF Safe House Supply Note", found: false },
-    { id: 28, category: "Artifact", name: "Pet Store Key", found: false },
-    { id: 29, category: "Artifact", name: "Join WLF Note", found: false },
-    { id: 30, category: "Artifact", name: "Plea to a Friend Letter", found: false },
-    { id: 31, category: "Artifact", name: "Lt. Torres' Final Memorandum", found: false },
-    { id: 32, category: "Artifact", name: "List of Known WLF Agitators", found: false },
-    { id: 33, category: "Artifact", name: "WLF Recruiter Journal", found: false },
-    { id: 34, category: "Artifact", name: "Leah's Photograph", found: false },
-    { id: 35, category: "Artifact", name: "Leah's Note", found: false },
-    { id: 36, category: "Artifact", name: "Isaac's Mandate", found: false },
-    { id: 37, category: "Artifact", name: "Chevy's Apology", found: false },
-    { id: 38, category: "Artifact", name: "Raul's Olive Branch", found: false },
-    { id: 39, category: "Artifact", name: "Rebecca's Tip Off", found: false },
-    { id: 40, category: "Artifact", name: "Tower Doodles", found: false },
-    { id: 41, category: "Artifact", name: "Raul's Account", found: false },
-    { id: 42, category: "Artifact", name: "Fran's Refusal", found: false },
-    { id: 43, category: "Artifact", name: "Thrift Store Reminder", found: false },
-    { id: 44, category: "Artifact", name: "Dad's Pep Talk", found: false },
-    { id: 45, category: "Artifact", name: "Subway Note", found: false },
-    { id: 46, category: "Artifact", name: "Whittled Statue", found: false },
-    { id: 47, category: "Artifact", name: "Locker Room Code", found: false },
-    { id: 48, category: "Artifact", name: "Soda Can Note", found: false },
-    { id: 49, category: "Artifact", name: "Subway Station Note", found: false },
-    { id: 50, category: "Artifact", name: "Suicide Note", found: false },
-    { id: 51, category: "Artifact", name: "Boris' Daughter's Drawing", found: false },
-    { id: 52, category: "Artifact", name: "Join WLF Note", found: false },
-    { id: 53, category: "Artifact", name: "Need a Plan Note", found: false },
-    { id: 54, category: "Artifact", name: "Yolanda's Note", found: false },
-    { id: 55, category: "Artifact", name: "Condolence Note", found: false },
-    { id: 56, category: "Artifact", name: "Note in Hillcrest Tattoo Parlour", found: false },
-    { id: 57, category: "Artifact", name: "Dale's Combo", found: false },
-    { id: 58, category: "Artifact", name: "Turn in Boris Note", found: false },
-    { id: 59, category: "Artifact", name: "Boris' Confession", found: false },
-    { id: 60, category: "Artifact", name: "Rosemont's Flyer", found: false },
-    { id: 61, category: "Artifact", name: "Tara's Invitation", found: false },
-    { id: 62, category: "Artifact", name: "Hotel Note", found: false },
-    { id: 63, category: "Artifact", name: "Evacuation Letter", found: false },
-    { id: 64, category: "Artifact", name: "WLF Target List", found: false },
-    { id: 65, category: "Artifact", name: "WLF Deserter Letter", found: false },
-    { id: 66, category: "Artifact", name: "Last Letter to Husband", found: false },
-    { id: 67, category: "Artifact", name: "Dying Husband's Plea", found: false },
-    { id: 68, category: "Artifact", name: "Pharmacy Note", found: false },
-    { id: 69, category: "Artifact", name: "Hospital Supply List", found: false },
-    { id: 70, category: "Artifact", name: "Garage Note", found: false },
-    { id: 71, category: "Artifact", name: "Bookstore Note", found: false },
-    { id: 72, category: "Artifact", name: "Textile Note", found: false },
-    { id: 73, category: "Artifact", name: "Stash Note", found: false },
-    { id: 74, category: "Artifact", name: "Shambler Note", found: false },
-    { id: 75, category: "Artifact", name: "Sniper's Note", found: false },
-    { id: 76, category: "Artifact", name: "Encampment Note", found: false },
-    { id: 77, category: "Artifact", name: "Arcade Flyer", found: false },
-    { id: 78, category: "Artifact", name: "Arcade Note", found: false },
-    { id: 79, category: "Artifact", name: "WLF Gun Cache Note", found: false },
-    { id: 80, category: "Artifact", name: "WLF Interrogator Letter", found: false },
-    { id: 81, category: "Artifact", name: "Scar's Suicide Letter", found: false },
-    { id: 82, category: "Artifact", name: "Jasmine Bakery Sale", found: false },
-    { id: 83, category: "Artifact", name: "Strange Artefact", found: false },
-    { id: 84, category: "Artifact", name: "Plea to Seraphite Prophet", found: false },
-    { id: 85, category: "Artifact", name: "Seraphite Prayer to Prophet - Peace", found: false },
-    { id: 86, category: "Artifact", name: "Seraphite Prayer to Prophet - Steed", found: false },
-    { id: 87, category: "Artifact", name: "Seraphite Prayer to Prophet - Respect", found: false },
-    { id: 88, category: "Artifact", name: "Prayer for Victory", found: false },
-    { id: 89, category: "Artifact", name: "Seraphite Prayer to Prophet - Prosperity", found: false },
-    { id: 90, category: "Artifact", name: "Seraphite Prayer to Prophet - Pairing", found: false },
-    { id: 91, category: "Artifact", name: "WLF Soldier Meets Prophet Letter", found: false },
-    { id: 92, category: "Artifact", name: "Letter from Seraphite Father to Son", found: false },
-    { id: 93, category: "Artifact", name: "Failed Truce", found: false },
-    { id: 94, category: "Artifact", name: "Infirmary Note", found: false },
-    { id: 95, category: "Artifact", name: "Mutiny Note", found: false },
-    { id: 96, category: "Artifact", name: "Ferry Log", found: false },
-    { id: 97, category: "Artifact", name: "Amputation Supplies", found: false },
-    { id: 98, category: "Artifact", name: "Survivor Plea", found: false },
-    { id: 99, category: "Artifact", name: "Neighbour Exchange", found: false },
-    { id: 100, category: "Artifact", name: "Scavenging List", found: false },
-    { id: 101, category: "Artifact", name: "Seraphite Truce", found: false },
-    { id: 102, category: "Artifact", name: "Seraphite Orders", found: false },
-    { id: 103, category: "Artifact", name: "Gym Safe Combo", found: false },
-    { id: 104, category: "Artifact", name: "FEDRA Orders", found: false },
-    { id: 105, category: "Artifact", name: "FEDRA Final Order", found: false },
-    { id: 106, category: "Artifact", name: "Annex Letter", found: false },
-    { id: 107, category: "Artifact", name: "Soldier's Letter", found: false },
-    { id: 108, category: "Artifact", name: "Chapel Note", found: false },
-    { id: 109, category: "Artifact", name: "Patient's Note", found: false },
-    { id: 110, category: "Artifact", name: "Doctor's Note", found: false },
-    { id: 111, category: "Artifact", name: "Marina Note", found: false },
-    { id: 112, category: "Artifact", name: "WLF Scout Journal", found: false },
-    { id: 113, category: "Artifact", name: "Venison Distribution Note", found: false },
-    { id: 114, category: "Artifact", name: "Mournful Prayer Note", found: false },
-    { id: 115, category: "Artifact", name: "Young Seraphite's Journal", found: false },
-    { id: 116, category: "Artifact", name: "The Rattlers Note", found: false },
-    { id: 117, category: "Artifact", name: "The Rattlers Warning and Suicide Note", found: false },
-    { id: 118, category: "Artifact", name: "Abby's Note", found: false },
-    { id: 119, category: "Artifact", name: "Letter from the Seraphite Father to Son", found: false },
-    { id: 120, category: "Artifact", name: "Venison Distribution Note", found: false },
-    { id: 121, category: "Artifact", name: "Mournful Prayer Note", found: false },
-    { id: 122, category: "Artifact", name: "Young Seraphite's Journal", found: false },
-    { id: 123, category: "Artifact", name: "Failed Truce", found: false },
-    { id: 124, category: "Artifact", name: "Infirmary Note", found: false },
-    { id: 125, category: "Artifact", name: "Mutiny Note", found: false },
-    { id: 126, category: "Artifact", name: "Ferry Log", found: false },
-    { id: 127, category: "Artifact", name: "Isaac's Mandate", found: false },
-    { id: 128, category: "Trading Card", name: "The Keene Twins", found: false },
-    { id: 129, category: "Trading Card", name: "Tesseracter", found: false },
-    { id: 130, category: "Trading Card", name: "Laurent Foucault, CEO Spark", found: false },
-    { id: 131, category: "Trading Card", name: "Motivator", found: false },
-    { id: 132, category: "Trading Card", name: "The Starfire Kids", found: false },
-    { id: 133, category: "Trading Card", name: "Chessmaster", found: false },
-    { id: 134, category: "Trading Card", name: "Oozer", found: false },
-    { id: 135, category: "Trading Card", name: "Flo", found: false },
-    { id: 136, category: "Trading Card", name: "Doctor Uckmann", found: false },
-    { id: 137, category: "Trading Card", name: "Big Blue", found: false },
-    { id: 138, category: "Trading Card", name: "Das Wort", found: false },
-    { id: 139, category: "Trading Card", name: "Know It All", found: false },
-    { id: 140, category: "Trading Card", name: "Cardio", found: false },
-    { id: 141, category: "Trading Card", name: "Kinnard, Esq.", found: false },
-    { id: 142, category: "Trading Card", name: "Rockafella", found: false },
-    { id: 143, category: "Trading Card", name: "Doctor Stem", found: false },
-    { id: 144, category: "Trading Card", name: "Sergeant Frost", found: false },
-    { id: 145, category: "Trading Card", name: "Candelabra", found: false },
-    { id: 146, category: "Trading Card", name: "Bizzarebra", found: false },
-    { id: 147, category: "Trading Card", name: "Kimimela", found: false },
-    { id: 148, category: "Trading Card", name: "The Imp", found: false },
-    { id: 149, category: "Trading Card", name: "Dr Daniela Star", found: false },
-    { id: 150, category: "Trading Card", name: "Bastet", found: false },
-    { id: 151, category: "Trading Card", name: "Mortem", found: false },
-    { id: 152, category: "Trading Card", name: "Beyond", found: false },
-    { id: 153, category: "Trading Card", name: "Nighthawk", found: false },
-    { id: 154, category: "Trading Card", name: "Saura", found: false },
-    { id: 155, category: "Trading Card", name: "Wachumero", found: false },
-    { id: 156, category: "Trading Card", name: "Sahir the Sorcerer", found: false },
-    { id: 157, category: "Trading Card", name: "Naledi the Youthful", found: false },
-    { id: 158, category: "Trading Card", name: "Brainstorm", found: false },
-    { id: 159, category: "Trading Card", name: "Reverb", found: false },
-    { id: 160, category: "Trading Card", name: "The Austringer", found: false },
-    { id: 161, category: "Trading Card", name: "Randy Styles", found: false },
-    { id: 162, category: "Trading Card", name: "Shift", found: false },
-    { id: 163, category: "Trading Card", name: "Star Sign", found: false },
-    { id: 164, category: "Trading Card", name: "Doppleganger", found: false },
-    { id: 165, category: "Trading Card", name: "Arch-Enemy", found: false },
-    { id: 166, category: "Trading Card", name: "Bhat M'Andarr", found: false },
-    { id: 167, category: "Trading Card", name: "Esquire", found: false },
-    { id: 168, category: "Trading Card", name: "Tormentra", found: false },
-    { id: 169, category: "Trading Card", name: "Tanager", found: false },
-    { id: 170, category: "Trading Card", name: "Tatuaje", found: false },
-    { id: 171, category: "Trading Card", name: "Seff-L'ho'phad", found: false },
-    { id: 172, category: "Trading Card", name: "Khazakh Bright", found: false },
-    { id: 173, category: "Trading Card", name: "CBB-73", found: false },
-    { id: 174, category: "Trading Card", name: "Sparkthug", found: false },
-    { id: 175, category: "Coin", name: "Virginia", found: false },
-    { id: 176, category: "Coin", name: "Alaska", found: false },
-    { id: 177, category: "Coin", name: "Maine", found: false },
-    { id: 178, category: "Coin", name: "New Jersey", found: false },
-    { id: 179, category: "Coin", name: "Vermont", found: false },
-    { id: 180, category: "Coin", name: "Kentucky", found: false },
-    { id: 181, category: "Coin", name: "Massachusetts", found: false },
-    { id: 182, category: "Coin", name: "Ohio", found: false },
-    { id: 183, category: "Coin", name: "Indiana", found: false },
-    { id: 184, category: "Coin", name: "California", found: false },
-    { id: 185, category: "Coin", name: "New Mexico", found: false },
-    { id: 186, category: "Coin", name: "South Carolina", found: false },
-    { id: 187, category: "Coin", name: "North Dakota", found: false },
-    { id: 188, category: "Coin", name: "Alabama", found: false },
-    { id: 189, category: "Coin", name: "West Virginia", found: false },
-    { id: 190, category: "Coin", name: "Utah", found: false },
-    { id: 191, category: "Coin", name: "Mississippi", found: false },
-    { id: 192, category: "Coin", name: "Nevada", found: false },
-    { id: 193, category: "Coin", name: "Colorado", found: false },
-    { id: 194, category: "Coin", name: "Illinois", found: false },
-    { id: 195, category: "Coin", name: "Oregon", found: false },
-    { id: 196, category: "Coin", name: "Wisconsin", found: false },
-    { id: 197, category: "Coin", name: "Rhode Island", found: false },
-    { id: 198, category: "Coin", name: "Missouri", found: false },
-    { id: 199, category: "Coin", name: "Washington", found: false },
-    { id: 200, category: "Coin", name: "Hawaii", found: false },
-    { id: 201, category: "Coin", name: "Kansas", found: false },
-    { id: 202, category: "Coin", name: "Louisiana", found: false },
-    { id: 203, category: "Coin", name: "Idaho", found: false },
-    { id: 204, category: "Coin", name: "North Carolina", found: false },
-    { id: 205, category: "Coin", name: "Montana", found: false },
-    { id: 206, category: "Coin", name: "Arkansas", found: false },
-    { id: 207, category: "Journal Entry", name: "Owl Mug", found: false },
-    { id: 208, category: "Journal Entry", name: "Joel's Guitar", found: false },
-    { id: 209, category: "Journal Entry", name: "WLF Gate", found: false },
-    { id: 210, category: "Journal Entry", name: "Street View", found: false },
-    { id: 211, category: "Journal Entry", name: "Hebrew Calendar", found: false },
-    { id: 212, category: "Journal Entry", name: "Dead Shambler Body", found: false },
-    { id: 213, category: "Journal Entry", name: "Entrance (Museum T-Rex)", found: false },
-    { id: 214, category: "Journal Entry", name: "Space Rocket", found: false },
-    { id: 215, category: "Journal Entry", name: "Fuck the WLF Graffiti", found: false },
-    { id: 216, category: "Journal Entry", name: "Rattler's Boat", found: false },
-    { id: 217, category: "Journal Entry", name: "Hospital Sign", found: false },
-    { id: 218, category: "Journal Entry", name: "Ferris Wheel", found: false },
-    { id: 219, category: "Journal Entry", name: "Owen's Firefly Pendant", found: false },
-    { id: 220, category: "Journal Entry", name: "2425 Constance", found: false },
-    { id: 221, category: "Journal Entry", name: "Fuck All These Groups Graffiti", found: false },
-    { id: 222, category: "Journal Entry", name: "Journal Entry 16", found: false },
-    { id: 223, category: "Journal Entry", name: "Journal Entry 17", found: false },
-    { id: 224, category: "Journal Entry", name: "Journal Entry 18", found: false },
-    { id: 225, category: "Journal Entry", name: "Journal Entry 19", found: false },
-    { id: 226, category: "Journal Entry", name: "Journal Entry 20", found: false },
-    { id: 227, category: "Training Manual", name: "Crafting", found: false },
-    { id: 228, category: "Training Manual", name: "Stealth", found: false },
-    { id: 229, category: "Training Manual", name: "Precision", found: false },
-    { id: 230, category: "Training Manual", name: "Explosives", found: false },
-    { id: 231, category: "Training Manual", name: "Covert Ops", found: false },
-    { id: 232, category: "Training Manual", name: "Close Quarters", found: false },
-    { id: 233, category: "Training Manual", name: "Firearms", found: false },
-    { id: 234, category: "Training Manual", name: "Ordinance", found: false },
 
-  ]);
+  const [collectibles, setCollectibles] = useState(() => {
+    try {
+      const saved = localStorage.getItem('tlou_collectibles');
+      if (saved) {
+        return JSON.parse(saved);
+      }
+    } catch (error) {
+      console.error('Error loading collectibles from localStorage:', error);
+    }
+
+
+    return [
+      { id: 1, category: "Artifact", name: "Volunteer Request", found: false },
+      { id: 2, category: "Artifact", name: "Letter from Seth", found: false },
+      { id: 3, category: "Artifact", name: "A Note to Santa", found: false },
+      { id: 4, category: "Artifact", name: "Supermarket Apology", found: false },
+      { id: 5, category: "Artifact", name: "Good Boy Combo", found: false },
+      { id: 6, category: "Artifact", name: "Eugene's Firefly Pendant", found: false },
+      { id: 7, category: "Artifact", name: "Photo of Eugene and Tommy", found: false },
+      { id: 8, category: "Artifact", name: "Eugene's Ultimatum", found: false },
+      { id: 9, category: "Artifact", name: "Joel's Watch", found: false },
+      { id: 10, category: "Artifact", name: "Map of Seattle", found: false },
+      { id: 128, category: "Trading Card", name: "The Keene Twins", found: false },
+      { id: 129, category: "Trading Card", name: "Tesseracter", found: false },
+      { id: 130, category: "Trading Card", name: "Laurent Foucault, CEO Spark", found: false },
+      { id: 131, category: "Trading Card", name: "Motivator", found: false },
+      { id: 132, category: "Trading Card", name: "The Starfire Kids", found: false },
+      { id: 175, category: "Coin", name: "Virginia", found: false },
+      { id: 176, category: "Coin", name: "Alaska", found: false },
+      { id: 177, category: "Coin", name: "Maine", found: false },
+      { id: 178, category: "Coin", name: "New Jersey", found: false },
+      { id: 179, category: "Coin", name: "Vermont", found: false },
+      { id: 207, category: "Journal Entry", name: "Owl Mug", found: false },
+      { id: 208, category: "Journal Entry", name: "Joel's Guitar", found: false },
+      { id: 209, category: "Journal Entry", name: "WLF Gate", found: false },
+      { id: 210, category: "Journal Entry", name: "Street View", found: false },
+      { id: 211, category: "Journal Entry", name: "Hebrew Calendar", found: false },
+      { id: 227, category: "Training Manual", name: "Crafting", found: false },
+      { id: 228, category: "Training Manual", name: "Stealth", found: false },
+      { id: 229, category: "Training Manual", name: "Precision", found: false },
+      { id: 230, category: "Training Manual", name: "Explosives", found: false },
+      { id: 231, category: "Training Manual", name: "Covert Ops", found: false },
+    ];
+  });
+
+
+  React.useEffect(() => {
+    localStorage.setItem('tlou_collectibles', JSON.stringify(collectibles));
+  }, [collectibles]);
 
   const toggleCollectible = (id) => {
     setCollectibles(prev => prev.map(item =>
@@ -1538,3 +1347,5 @@ const CollectiblesPage = ({ theme, settings }) => {
     </div>
   );
 };
+
+export default App; 
