@@ -697,7 +697,17 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
 
-
+signInAnonymously(auth)
+  .then(() => {
+    // Signed in successfully
+    console.log("Successfully signed in anonymously.");
+  })
+  .catch((error) => {
+    // Handle Errors here.
+    const errorCode = error.code;
+    const errorMessage = error.message;
+    console.error(`Error signing in: ${errorCode} - ${errorMessage}`);
+  });
 
 const generateUniqueId = () => {
   return 'id-' + Date.now() + '-' + Math.random().toString(16).slice(2);
