@@ -31,11 +31,11 @@ export default function App() {
     return () => authUnsubscribe();
   }, []);
 
- 
+
   useEffect(() => {
     if (!isAuthReady || !userId) return;
 
-  
+
     const q = query(
       collection(db, `users/${userId}/conversations`),
       orderBy("createdAt", "desc")
@@ -48,7 +48,7 @@ export default function App() {
 
       setConversations(convs);
 
-     
+
       if (convs.length === 0) {
         const newChatRef = doc(collection(db, `users/${userId}/conversations`));
         const newChatId = newChatRef.id;
@@ -59,7 +59,7 @@ export default function App() {
         });
         setCurrentChatId(newChatId);
       } else {
-     
+
         if (!convs.some(c => c.id === currentChatId)) {
           setCurrentChatId(convs[0]?.id || null);
         }
@@ -124,20 +124,20 @@ export default function App() {
       timestamp: new Date().toISOString()
     };
 
-   
+
     setConversations(prev => prev.map(conv =>
       conv.id === currentChatId ? { ...conv, messages: [...conv.messages, userMessage] } : conv
     ));
     setNewMessage('');
 
     try {
-    
+
       const chatDocRef = doc(db, `users/${userId}/conversations/${currentChatId}`);
       await setDoc(chatDocRef, {
         messages: [...(currentChat?.messages || []), userMessage],
       }, { merge: true });
 
-      const response = await fetch('YOUR_API_ENDPOINT_HERE', {
+      const response = await fetch('https://wlf-chatbot.nw.r.appspot.com', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query: userMessage.text })
@@ -152,7 +152,7 @@ export default function App() {
         images: data.images
       };
 
-     
+
       await setDoc(chatDocRef, {
         messages: [...(currentChat?.messages || []), userMessage, botMessage],
       }, { merge: true });
@@ -684,13 +684,13 @@ import {
 
 
 const firebaseConfig = {
-  apiKey: "AIzaSyBXdhrPNMwr-jPWG10aY8_EMpCS2ZQEN1U",
-  authDomain: "wlf-chatbot-58449.firebaseapp.com",
-  projectId: "wlf-chatbot-58449",
-  storageBucket: "wlf-chatbot-58449.firebasestorage.app",
-  messagingSenderId: "414493982512",
-  appId: "1:414493982512:web:a45a15b19a41f9634e52f5",
-  measurementId: "G-4VXTX5LYKK"
+  apiKey: process.env.FIREBASE_API_KEY,
+  authDomain: process.env.FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.FIREBASE_PROJECT_ID,
+  storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.FIREBASE_APP_ID,
+  measurementId: process.env.FIREBASE_MEASUREMENT_ID,
 };
 
 

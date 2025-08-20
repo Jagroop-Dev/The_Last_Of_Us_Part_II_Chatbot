@@ -10,7 +10,6 @@ bs4
 requests
 pandas
 numpy
-ast
 faiss-cpu
 sentence-transformers
 hf-xet
