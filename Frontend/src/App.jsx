@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 
-const apiUrl = import.meta.env.VITE_API_URL;
+const apiUrl = 'https://wlf-chatbot.nw.r.appspot.com/ask';
 
 const App = () => {
 
